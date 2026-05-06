@@ -1,70 +1,153 @@
-# Getting Started with Create React App
+# Acharya Campus Navigator
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+An offline-friendly campus navigation system for Acharya Institute of Technology. The app renders a real campus map with Leaflet, lets users choose an entry gate, and computes the shortest walking path to a destination using Dijkstra's algorithm. Data is served from a Node/Express API backed by MongoDB, with a fully embedded fallback dataset for offline mode.
 
-## Available Scripts
+## Key Features
 
-In the project directory, you can run:
+- Interactive map with custom markers and animated route drawing.
+- Gate-first onboarding with QR-friendly source selection via URL query param.
+- Shortest path routing and estimated walking time.
+- Offline-first behavior with localStorage caching and embedded fallback data.
+- Admin-style API endpoints for nodes/edges CRUD (basic, no auth).
 
-### `npm start`
+## Architecture Overview
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Frontend (React + Leaflet)
+- Loads campus nodes/edges from API with cache fallback.
+- Renders markers (gates/blocks) and a polyline route.
+- Computes path client-side via Dijkstra on the loaded graph.
+- Works offline using cached or embedded data.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Backend (Node + Express + MongoDB)
+- Stores nodes and edges in MongoDB.
+- Exposes REST endpoints under `/api` for nodes, edges, and search.
+- Includes a seeding script with curated campus data.
 
-### `npm test`
+## Project Structure
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- [server/server.js](server/server.js): Express app setup, middleware, and routes.
+- [server/routes/api.js](server/routes/api.js): API endpoints for nodes, edges, and search.
+- [server/models/Node.js](server/models/Node.js): Node schema (gate/block/junction).
+- [server/models/Edge.js](server/models/Edge.js): Edge schema (from/to/distance).
+- [server/seed.js](server/seed.js): Seed script with bidirectional campus graph.
+- [src/App.js](src/App.js): App shell, data loading, route calculation, UI flow.
+- [src/components/MapView.jsx](src/components/MapView.jsx): Leaflet map, markers, polyline animation.
+- [src/components/SearchBar.jsx](src/components/SearchBar.jsx): Destination search with API + fallback.
+- [src/components/RoutePanel.jsx](src/components/RoutePanel.jsx): Route stats and step list.
+- [src/services/api.js](src/services/api.js): API calls + offline cache logic.
+- [src/utils/dijkstra.js](src/utils/dijkstra.js): Dijkstra + walking time utilities.
+- [src/utils/campusData.js](src/utils/campusData.js): Embedded campus nodes/edges.
 
-### `npm run build`
+## Data Model
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Node
+- `id`: string (unique, index)
+- `name`: string
+- `type`: `gate` | `block` | `junction`
+- `coordinates`: [lat, lng]
+- `description`: string (optional)
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Edge
+- `from`: string (node id)
+- `to`: string (node id)
+- `distance`: number (meters, non-negative)
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+The seed script inserts bidirectional edges, so every path is walkable both ways.
 
-### `npm run eject`
+## API Endpoints
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Base URL: `http://localhost:5000/api`
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- `GET /nodes`: List all nodes.
+- `GET /edges`: List all edges.
+- `GET /search?q=...`: Search nodes by name (case-insensitive, limited to 10).
+- `POST /nodes`: Create a node.
+- `PUT /nodes/:id`: Update a node by `id`.
+- `POST /edges`: Create an edge.
+- `DELETE /nodes/:id`: Delete node and related edges.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+Note: There is no authentication layer yet, so treat write endpoints as admin-only in trusted environments.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Routing Logic
 
-## Learn More
+- The frontend builds an adjacency list from nodes and edges.
+- Dijkstra's algorithm finds the shortest path by total distance.
+- The route is displayed as a polyline with a draw animation.
+- Walking time is estimated at ~80 meters per minute.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Offline Behavior
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- Responses for nodes/edges are cached in `localStorage` for 24 hours.
+- If the API is unavailable, cached data or embedded campus data is used.
+- A service worker is registered for additional offline support.
 
-### Code Splitting
+## Environment Variables
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+Create a `.env` file for the server and set:
 
-### Analyzing the Bundle Size
+```
+MONGODB_URI=<your-mongodb-connection-string>
+PORT=5000
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Optionally for the frontend:
 
-### Making a Progressive Web App
+```
+REACT_APP_API_URL=http://localhost:5000/api
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## Setup and Run
 
-### Advanced Configuration
+Install dependencies:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+```
+npm install
+```
 
-### Deployment
+Seed the database:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+```
+npm run seed
+```
 
-### `npm run build` fails to minify
+Start the API server:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```
+npm run server
+```
+
+Start the React app:
+
+```
+npm start
+```
+
+## Usage Flow
+
+1) Pick a gate on the welcome screen or open with `?src=gate_1`.
+2) Search for a destination or click a marker.
+3) View distance, walking time, and optional step list.
+
+## Tech Stack
+
+- React 19 + Create React App
+- Leaflet + React-Leaflet
+- Node.js + Express 5
+- MongoDB + Mongoose 9
+
+## Notes and Limitations
+
+- The current dataset is specific to the Acharya campus and uses curated OSM-based coordinates.
+- Write endpoints are unsecured and intended for internal use.
+- Route steps display raw node ids, not user-friendly turn-by-turn directions.
+
+## Scripts
+
+- `npm start`: Start the React dev server.
+- `npm run server`: Start the API server.
+- `npm run seed`: Seed MongoDB with campus data.
+- `npm run build`: Build the frontend for production.
+
+## Credits
+
+- Campus road geometry derived from OpenStreetMap tiles.
